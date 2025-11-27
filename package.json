@@ -1,0 +1,22 @@
+{
+  "name": "cdn-mcp-servers",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP servers for internal CDN documentation search and related tools",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "build": "tsc -p ."
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.23.0",
+    "zod": "^3.25.0",
+    "axios": "^1.7.7",
+    "cheerio": "^1.0.0-rc.12"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.4.0",
+    "@types/cheerio": "^0.22.33"
+  }
+}
