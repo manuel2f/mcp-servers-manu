@@ -156,8 +156,89 @@ El servidor se comunica por STDIO según MCP. Debes registrarlo en tu configurac
    {"tool": "get_cdn_doc", "component": "cdn-action-runner", "path": "code-docs/makefile/index"}
    ```
 
+## Testing - Script `test-mcp.ts`
+
+El archivo `test-mcp.ts` permite probar el MCP de forma directa sin necesidad de integrarlo en VS Code o GitHub Copilot.
+
+### Instalación de dependencias
+
+```bash
+npm install
+```
+
+### Uso del script de prueba
+
+**Sintaxis general:**
+
+```bash
+npx tsx test-mcp.ts <tool-name> [args-json]
+```
+
+### Ejemplos de uso
+
+**1. Listar todos los componentes disponibles:**
+
+```bash
+npx tsx test-mcp.ts list_cdn_components
+# O especificar versión
+npx tsx test-mcp.ts list_cdn_components '{"version":"25.11.100"}'
+```
+
+**2. Buscar un componente específico:**
+
+```bash
+# Explorar estructura de cdn-action-runner
+npx tsx test-mcp.ts search_cdn_component '{"component":"cdn-action-runner"}'
+
+# Buscar documentos con "makefile" en cdn-action-runner
+npx tsx test-mcp.ts search_cdn_component '{"component":"cdn-action-runner","query":"makefile"}'
+```
+
+**3. Búsqueda global en toda la documentación:**
+
+```bash
+npx tsx test-mcp.ts search_cdn_docs '{"query":"makefile"}'
+
+# Con versión específica
+npx tsx test-mcp.ts search_cdn_docs '{"query":"docker","version":"25.11.100"}'
+```
+
+### Variables de entorno para testing
+
+Puedes personalizar el comportamiento con variables de entorno:
+
+```bash
+# Especificar URL base diferente
+export CDN_DOCS_BASE_URL="http://custom-url/cdn/repositories"
+
+# Especificar versión por defecto
+export CDN_DOCS_VERSION="25.9.100"
+
+npx tsx test-mcp.ts list_cdn_components
+```
+
+### Salida del script
+
+Cada comando retorna JSON formateado con los resultados:
+
+```json
+{
+  "version": "25.11.100",
+  "count": 42,
+  "components": ["cdn-action-runner", "cdn-ad-server-mock", ...]
+}
+```
+
+### Solución de problemas
+
+- **Timeout de conexión:** Aumenta el timeout modificando la constante en `test-mcp.ts` o verifica la conectividad a `cdn-docs.cdn.hi.inet`
+- **404 Not Found:** Verifica que el componente existe con `list_cdn_components`
+- **Errores de parsing JSON:** Asegúrate de escapar correctamente las comillas en el JSON
+
 ## Extensión Futura
+
 Posibles mejoras adicionales:
+
 - Búsqueda semántica usando embeddings
 - Índice invertido para búsquedas más rápidas
 - Extracción de diagramas PlantUML
@@ -165,6 +246,7 @@ Posibles mejoras adicionales:
 - Soporte para múltiples versiones simultáneas
 
 ## Notas Técnicas
+
 - La extracción HTML está optimizada para AsciiDoc convertido a HTML
 - Los selectores priorizan `.toc`, `.sect1`, `.sect2` típicos de AsciiDoc
 - Timeout de 8 segundos por petición HTTP
