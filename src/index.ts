@@ -497,7 +497,7 @@ async function searchInWiki(query: string | undefined, version: string): Promise
 }
 
 async function performSearch(query: string, version: string): Promise<any> {
-  const searchUrl = `${BASE_DOCS_URL}/${version}/docs/components/cdn-docs-server/search.html?search=${encodeURIComponent(query)}`;
+  const searchUrl = `${BASE_DOCS_URL}/${version}/docs/components/cdn-docs-server/search.adoc?search=${encodeURIComponent(query)}`;
   try {
     const resp = await axios.get(searchUrl, { timeout: 8000 });
     const html = resp.data as string;
