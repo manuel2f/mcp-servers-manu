@@ -8,6 +8,8 @@ Proveer herramientas (tools) del Model Context Protocol que permitan:
 - Explorar componentes específicos (cdn-action-runner, cdn-ad-server-mock, etc.)
 - Listar componentes disponibles
 - Obtener contenido de documentos .adoc específicos
+- Buscar en documentación DTS (Design and Technical Specifications)
+- Buscar en documentación Wiki
 
 La documentación está alojada en:
 ```
@@ -78,8 +80,40 @@ Obtiene el contenido completo de un documento específico.
 {"component": "cdn-action-runner", "path": "code-docs/makefile/index"}
 ```
 
+### 5. `search_dts`
+Busca en la documentación de DTS (Design and Technical Specifications) ubicada en `cdn-documentation/dts`.
+
+**Parámetros:**
+- `query` (string, opcional): Término a buscar. Si se omite, lista la estructura disponible
+- `version` (string, opcional): Versión de docs (default: `25.11.100`)
+
+**Ejemplos:**
+```json
+// Buscar "design" en DTS
+{"query": "design"}
+
+// Listar toda la estructura de DTS
+{}
+```
+
+### 6. `search_wiki`
+Busca en la documentación de Wiki ubicada en `cdn-documentation/wiki`.
+
+**Parámetros:**
+- `query` (string, opcional): Término a buscar. Si se omite, lista la estructura disponible
+- `version` (string, opcional): Versión de docs (default: `25.11.100`)
+
+**Ejemplos:**
+```json
+// Buscar "architecture" en Wiki
+{"query": "architecture"}
+
+// Listar toda la estructura de Wiki
+{}
+```
+
 ## Estructura
-- `src/index.ts`: Servidor MCP principal con 4 tools
+- `src/index.ts`: Servidor MCP principal con 6 tools
 - `package.json`: Dependencias y scripts
 - `tsconfig.json`: Configuración TypeScript
 

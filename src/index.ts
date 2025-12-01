@@ -37,6 +37,16 @@ const getDocSchema = z.object({
   version: z.string().optional().default(DEFAULT_VERSION)
 });
 
+const dtsSearchSchema = z.object({
+  query: z.string().optional(),
+  version: z.string().optional().default(DEFAULT_VERSION)
+});
+
+const wikiSearchSchema = z.object({
+  query: z.string().optional(),
+  version: z.string().optional().default(DEFAULT_VERSION)
+});
+
 
 // Helper: obtener lista de componentes disponibles
 async function getAvailableComponents(version: string): Promise<string[]> {
@@ -244,6 +254,248 @@ async function getDocContent(component: string, path: string, version: string): 
   }
 }
 
+// Helper: buscar en DTS (cdn-documentation/dts)
+async function searchInDTS(query: string | undefined, version: string): Promise<any> {
+  const dtsUrl = `${BASE_DOCS_URL}/${version}/docs/components/cdn-documentation/dts`;
+  
+  try {
+    // Primero intentar con index.html, si falla listar directorio
+    let indexUrl = `${dtsUrl}/index.html`;
+    let resp;
+    let useDirectoryListing = false;
+    
+    try {
+      resp = await axios.get(indexUrl, { timeout: 8000 });
+    } catch (indexErr: any) {
+      // Si no existe index.html, listar directorio
+      if (indexErr.response?.status === 404 || !query) {
+        useDirectoryListing = true;
+        indexUrl = `${dtsUrl}/`;
+        resp = await axios.get(indexUrl, { timeout: 8000 });
+      } else {
+        throw indexErr;
+      }
+    }
+    
+    const $ = cheerio.load(resp.data);
+    const results: Array<{ title: string; href: string; section?: string; type?: string }> = [];
+    
+    if (useDirectoryListing) {
+      // Listar archivos .adoc disponibles en el directorio
+      $('a[href]').each((_, el) => {
+        const href = $(el).attr('href');
+        if (href && href.endsWith('.adoc')) {
+          const filename = href;
+          const title = filename.replace('.adoc', '').replace(/_/g, ' ');
+          const absolute = new URL(href, indexUrl).toString();
+          
+          // Si hay query, filtrar por coincidencia
+          if (!query || title.toLowerCase().includes(query.toLowerCase()) || filename.toLowerCase().includes(query.toLowerCase())) {
+            results.push({ 
+              title: title, 
+              href: absolute,
+              type: 'document',
+              section: 'DTS'
+            });
+          }
+        }
+      });
+      
+      // También incluir carpetas
+      $('a[href]').each((_, el) => {
+        const href = $(el).attr('href');
+        if (href && href.endsWith('/') && !href.startsWith('?') && !href.startsWith('/')) {
+          const foldername = href.replace('/', '');
+          if (!query || foldername.toLowerCase().includes(query.toLowerCase())) {
+            results.push({ 
+              title: foldername, 
+              href: new URL(href, indexUrl).toString(),
+              type: 'folder',
+              section: 'DTS'
+            });
+          }
+        }
+      });
+    } else if (query) {
+      // Búsqueda específica en index.html
+      $('.search-results a, a.result, .sect1 a, .sect2 a').each((_, el) => {
+        const href = $(el).attr('href');
+        const title = $(el).text().trim();
+        if (href && (title.toLowerCase().includes(query.toLowerCase()) || href.toLowerCase().includes(query.toLowerCase()))) {
+          const absolute = href.startsWith('http') ? href : new URL(href, indexUrl).toString();
+          results.push({ title: title || href, href: absolute, section: 'DTS' });
+        }
+      });
+    } else {
+      // Listar estructura desde index.html
+      $('.toc a, nav a, .sect1 > h2, .sect2 > h3').each((_, el) => {
+        const $el = $(el);
+        const href = $el.attr('href');
+        const title = $el.text().trim();
+        const section = $el.closest('.sect1, .sect2').find('h2, h3').first().text().trim();
+        
+        if (href) {
+          const absolute = href.startsWith('http') ? href : new URL(href, indexUrl).toString();
+          results.push({ title: title || href, href: absolute, section });
+        } else if (title) {
+          results.push({ title, href: indexUrl, section: 'heading' });
+        }
+      });
+    }
+    
+    // Deduplicar
+    const seen = new Set<string>();
+    const deduped = results.filter(r => {
+      if (seen.has(r.href)) return false;
+      seen.add(r.href);
+      return true;
+    });
+
+    return {
+      content: [{
+        type: 'text',
+        text: JSON.stringify({ 
+          source: 'DTS',
+          query: query || 'structure', 
+          version, 
+          url: indexUrl, 
+          count: deduped.length, 
+          items: deduped 
+        }, null, 2)
+      }]
+    };
+  } catch (err: any) {
+    return {
+      isError: true,
+      content: [{
+        type: 'text',
+        text: `Error buscando en DTS: ${err.message}`
+      }]
+    };
+  }
+}
+
+// Helper: buscar en Wiki (cdn-documentation/wiki)
+async function searchInWiki(query: string | undefined, version: string): Promise<any> {
+  const wikiUrl = `${BASE_DOCS_URL}/${version}/docs/components/cdn-documentation/wiki`;
+  
+  try {
+    // Primero intentar con index.html, si falla listar directorio
+    let indexUrl = `${wikiUrl}/index.html`;
+    let resp;
+    let useDirectoryListing = false;
+    
+    try {
+      resp = await axios.get(indexUrl, { timeout: 8000 });
+    } catch (indexErr: any) {
+      // Si no existe index.html, listar directorio
+      if (indexErr.response?.status === 404 || !query) {
+        useDirectoryListing = true;
+        indexUrl = `${wikiUrl}/`;
+        resp = await axios.get(indexUrl, { timeout: 8000 });
+      } else {
+        throw indexErr;
+      }
+    }
+    
+    const $ = cheerio.load(resp.data);
+    const results: Array<{ title: string; href: string; section?: string; type?: string }> = [];
+    
+    if (useDirectoryListing) {
+      // Listar archivos .adoc disponibles en el directorio
+      $('a[href]').each((_, el) => {
+        const href = $(el).attr('href');
+        if (href && href.endsWith('.adoc')) {
+          const filename = href;
+          const title = filename.replace('.adoc', '').replace(/_/g, ' ');
+          const absolute = new URL(href, indexUrl).toString();
+          
+          // Si hay query, filtrar por coincidencia
+          if (!query || title.toLowerCase().includes(query.toLowerCase()) || filename.toLowerCase().includes(query.toLowerCase())) {
+            results.push({ 
+              title: title, 
+              href: absolute,
+              type: 'document',
+              section: 'Wiki'
+            });
+          }
+        }
+      });
+      
+      // También incluir carpetas
+      $('a[href]').each((_, el) => {
+        const href = $(el).attr('href');
+        if (href && href.endsWith('/') && !href.startsWith('?') && !href.startsWith('/')) {
+          const foldername = href.replace('/', '');
+          if (!query || foldername.toLowerCase().includes(query.toLowerCase())) {
+            results.push({ 
+              title: foldername, 
+              href: new URL(href, indexUrl).toString(),
+              type: 'folder',
+              section: 'Wiki'
+            });
+          }
+        }
+      });
+    } else if (query) {
+      // Búsqueda específica en index.html
+      $('.search-results a, a.result, .sect1 a, .sect2 a').each((_, el) => {
+        const href = $(el).attr('href');
+        const title = $(el).text().trim();
+        if (href && (title.toLowerCase().includes(query.toLowerCase()) || href.toLowerCase().includes(query.toLowerCase()))) {
+          const absolute = href.startsWith('http') ? href : new URL(href, indexUrl).toString();
+          results.push({ title: title || href, href: absolute, section: 'Wiki' });
+        }
+      });
+    } else {
+      // Listar estructura desde index.html
+      $('.toc a, nav a, .sect1 > h2, .sect2 > h3').each((_, el) => {
+        const $el = $(el);
+        const href = $el.attr('href');
+        const title = $el.text().trim();
+        const section = $el.closest('.sect1, .sect2').find('h2, h3').first().text().trim();
+        
+        if (href) {
+          const absolute = href.startsWith('http') ? href : new URL(href, indexUrl).toString();
+          results.push({ title: title || href, href: absolute, section });
+        } else if (title) {
+          results.push({ title, href: indexUrl, section: 'heading' });
+        }
+      });
+    }
+    
+    // Deduplicar
+    const seen = new Set<string>();
+    const deduped = results.filter(r => {
+      if (seen.has(r.href)) return false;
+      seen.add(r.href);
+      return true;
+    });
+
+    return {
+      content: [{
+        type: 'text',
+        text: JSON.stringify({ 
+          source: 'Wiki',
+          query: query || 'structure', 
+          version, 
+          url: indexUrl, 
+          count: deduped.length, 
+          items: deduped 
+        }, null, 2)
+      }]
+    };
+  } catch (err: any) {
+    return {
+      isError: true,
+      content: [{
+        type: 'text',
+        text: `Error buscando en Wiki: ${err.message}`
+      }]
+    };
+  }
+}
+
 async function performSearch(query: string, version: string): Promise<any> {
   const searchUrl = `${BASE_DOCS_URL}/${version}/docs/components/cdn-docs-server/search.html?search=${encodeURIComponent(query)}`;
   try {
@@ -301,7 +553,7 @@ async function performSearch(query: string, version: string): Promise<any> {
 async function main() {
   const mcpServer = new McpServer({
     name: 'cdn-mcp-docs-search',
-    version: '0.2.1'
+    version: '0.3.0'
   });
 
   // Tool 1: Búsqueda general en toda la documentación
@@ -354,6 +606,26 @@ async function main() {
     const path = args.path || 'index';
     const version = args.version || DEFAULT_VERSION;
     return await getDocContent(component, path, version);
+  });
+
+  // Tool 5: Buscar en DTS (cdn-documentation/dts)
+  mcpServer.registerTool('search_dts', {
+    description: 'Busca en la documentación de DTS (Design and Technical Specifications) del directorio cdn-documentation/dts. Si no se proporciona query, lista la estructura disponible.',
+    inputSchema: dtsSearchSchema
+  }, async (args: z.infer<typeof dtsSearchSchema>) => {
+    const query = args.query;
+    const version = args.version || DEFAULT_VERSION;
+    return await searchInDTS(query, version);
+  });
+
+  // Tool 6: Buscar en Wiki (cdn-documentation/wiki)
+  mcpServer.registerTool('search_wiki', {
+    description: 'Busca en la documentación de Wiki del directorio cdn-documentation/wiki. Si no se proporciona query, lista la estructura disponible.',
+    inputSchema: wikiSearchSchema
+  }, async (args: z.infer<typeof wikiSearchSchema>) => {
+    const query = args.query;
+    const version = args.version || DEFAULT_VERSION;
+    return await searchInWiki(query, version);
   });
 
   await mcpServer.connect(new StdioServerTransport());

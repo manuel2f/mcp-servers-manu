@@ -2,11 +2,13 @@
 /**
  * Script simple para probar el MCP server localmente
  * Uso: npx tsx test-mcp.ts [tool-name] [args-json]
- * 
+ *
  * Ejemplos:
  *   npx tsx test-mcp.ts list_cdn_components
  *   npx tsx test-mcp.ts search_cdn_component '{"component":"cdn-action-runner"}'
  *   npx tsx test-mcp.ts search_cdn_docs '{"query":"makefile"}'
+ *   npx tsx test-mcp.ts search_dts '{"query":"design"}'
+ *   npx tsx test-mcp.ts search_wiki '{"query":"architecture"}'
  */
 
 import axios from 'axios';
@@ -105,6 +107,110 @@ async function searchInComponent(component: string, query: string | undefined, v
   }
 }
 
+async function searchInDTS(query: string | undefined, version: string): Promise<any> {
+  const dtsUrl = `${BASE_DOCS_URL}/${version}/docs/components/cdn-documentation/dts`;
+  
+  try {
+    let indexUrl = `${dtsUrl}/index.html`;
+    let resp;
+    let useDirectoryListing = false;
+    
+    try {
+      console.error(`[DEBUG] Trying to fetch DTS: ${indexUrl}`);
+      resp = await axios.get(indexUrl, { timeout: 8000 });
+    } catch (indexErr: any) {
+      if (indexErr.response?.status === 404 || !query) {
+        console.error(`[DEBUG] DTS index.html not found, trying directory listing`);
+        useDirectoryListing = true;
+        indexUrl = `${dtsUrl}/`;
+        resp = await axios.get(indexUrl, { timeout: 8000 });
+      } else {
+        throw indexErr;
+      }
+    }
+    
+    const $ = cheerio.load(resp.data);
+    const results: Array<{ title: string; href: string; section?: string; type?: string }> = [];
+    
+    if (useDirectoryListing) {
+      $('a[href]').each((_, el) => {
+        const href = $(el).attr('href');
+        if (href && (href.endsWith('.adoc') || href.endsWith('/'))) {
+          const filename = href;
+          const title = filename.replace('.adoc', '').replace('/', '').replace(/_/g, ' ');
+          const absolute = new URL(href, indexUrl).toString();
+          
+          if (!query || title.toLowerCase().includes(query.toLowerCase())) {
+            results.push({ 
+              title, 
+              href: absolute,
+              type: href.endsWith('/') ? 'folder' : 'document',
+              section: 'DTS'
+            });
+          }
+        }
+      });
+    }
+    
+    return { source: 'DTS', query: query || 'structure', version, results };
+  } catch (err: any) {
+    console.error(`[ERROR] searchInDTS: ${err.message}`);
+    throw err;
+  }
+}
+
+async function searchInWiki(query: string | undefined, version: string): Promise<any> {
+  const wikiUrl = `${BASE_DOCS_URL}/${version}/docs/components/cdn-documentation/wiki`;
+  
+  try {
+    let indexUrl = `${wikiUrl}/index.html`;
+    let resp;
+    let useDirectoryListing = false;
+    
+    try {
+      console.error(`[DEBUG] Trying to fetch Wiki: ${indexUrl}`);
+      resp = await axios.get(indexUrl, { timeout: 8000 });
+    } catch (indexErr: any) {
+      if (indexErr.response?.status === 404 || !query) {
+        console.error(`[DEBUG] Wiki index.html not found, trying directory listing`);
+        useDirectoryListing = true;
+        indexUrl = `${wikiUrl}/`;
+        resp = await axios.get(indexUrl, { timeout: 8000 });
+      } else {
+        throw indexErr;
+      }
+    }
+    
+    const $ = cheerio.load(resp.data);
+    const results: Array<{ title: string; href: string; section?: string; type?: string }> = [];
+    
+    if (useDirectoryListing) {
+      $('a[href]').each((_, el) => {
+        const href = $(el).attr('href');
+        if (href && (href.endsWith('.adoc') || href.endsWith('/'))) {
+          const filename = href;
+          const title = filename.replace('.adoc', '').replace('/', '').replace(/_/g, ' ');
+          const absolute = new URL(href, indexUrl).toString();
+          
+          if (!query || title.toLowerCase().includes(query.toLowerCase())) {
+            results.push({ 
+              title, 
+              href: absolute,
+              type: href.endsWith('/') ? 'folder' : 'document',
+              section: 'Wiki'
+            });
+          }
+        }
+      });
+    }
+    
+    return { source: 'Wiki', query: query || 'structure', version, results };
+  } catch (err: any) {
+    console.error(`[ERROR] searchInWiki: ${err.message}`);
+    throw err;
+  }
+}
+
 async function performSearch(query: string, version: string): Promise<any> {
   const searchUrl = `${BASE_DOCS_URL}/${version}/docs/components/`;
   
@@ -171,6 +277,18 @@ async function main() {
       
       if (!query) throw new Error('query is required');
       result = await performSearch(query, version);
+    }
+    else if (toolName === 'search_dts') {
+      const query = (args as any).query;
+      const version = (args as any).version || DEFAULT_VERSION;
+      
+      result = await searchInDTS(query, version);
+    }
+    else if (toolName === 'search_wiki') {
+      const query = (args as any).query;
+      const version = (args as any).version || DEFAULT_VERSION;
+      
+      result = await searchInWiki(query, version);
     }
     else {
       throw new Error(`Unknown tool: ${toolName}`);
