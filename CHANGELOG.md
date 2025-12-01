@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0] - 2025-12-01
+
+### Añadido
+- **Tool `search_dts`**: Búsqueda en documentación DTS (Design and Technical Specifications) en `cdn-documentation/dts`
+- **Tool `search_wiki`**: Búsqueda en documentación Wiki en `cdn-documentation/wiki`
+- Capacidad de listar estructura completa cuando no se proporciona query en ambas herramientas
+- Soporte para búsqueda en carpetas y documentos .adoc
+- Actualización del script de pruebas `test-mcp.ts` para incluir las nuevas herramientas
+
+### Mejorado
+- README actualizado con documentación de las 6 herramientas disponibles
+- Ejemplos de uso para las nuevas herramientas DTS y Wiki
+
 ## [0.2.1] - 2025-11-27
 
 ### Corregido
